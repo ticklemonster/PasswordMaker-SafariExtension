@@ -1,0 +1,394 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+        <title>PasswordMaker for Safari</title>    
+        <link rel="stylesheet" type="text/css" href="passwordmaker.css" />
+        <script type='text/javascript'>
+            var profileList = [];
+            var currentProfile = null;
+            var charsets = [
+                            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`~!@#$%^&*()_-+={}|[]\\:\";\'<>?,./",
+                            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                            "0123456789abcdef",
+                            "0123456789",
+                            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                            "`~!@#$%^&*()_-+={}|[]\\:\";\'<>?,./"
+                            ];                
+                            
+            function onLoadHandler() {
+
+                safari.self.addEventListener("message",messageHandler,false);
+                
+                // Set the initial options programmatically
+                var selectObject = document.getElementById("charset");
+                selectObject.options.length = 0;
+                for( var i in charsets ) {
+                    var newopt = new Option(charsets[i], charsets[i], false, true);
+                    selectObject.options.add( newopt );
+                }
+                
+                
+                // load the profile list and show the details for the first profile.
+                safari.self.tab.dispatchMessage("getProfileNames", "" );
+                safari.self.tab.dispatchMessage("getProfile", "Default" );
+                    
+            }
+            
+            function messageHandler(event) {
+                //console.log("Received message: ", event.name );
+                
+                if( event.name == "profileNames" ) {
+                    // received an updated list of profile names
+                    profileList = event.message;
+                    var profileNode = document.getElementById('profile_list');
+                    profileNode.innerHTML = '';
+                    for( p in profileList ) {
+                        profileNode.innerHTML += '<option value="' + profileList[p] + '">' + profileList[p] + '</option>';
+                    }
+                }
+                
+                else if( event.name == "profile" ) {
+                    // received an updated profile detail
+                    currentProfile = event.message;
+                    
+                    var profileNode = document.getElementById('profile_list');
+                    for( o in profileNode.options ) {
+                        if( profileNode.options[o].value == currentProfile.name ) {
+                            profileNode.options[o].selected = true;
+                            break;
+                        }
+                    }
+                    setProfileForm( currentProfile );
+                    
+                }
+                
+                else {
+                    //console.dir( event );
+                }
+            }
+            
+            function setProfileForm( theProfile ){
+                if( !theProfile ) theProfile = currentProfile;
+                
+                // clear URL highlights
+                document.getElementById('exprotocol').className = document.getElementById('exprotocol').className.replace('url_highlight','');
+                document.getElementById('exsubdomain').className = document.getElementById('exsubdomain').className.replace('url_highlight','');
+                document.getElementById('exdomain').className = document.getElementById('exdomain').className.replace('url_highlight','');
+                document.getElementById('expath').className = document.getElementById('expath').className.replace('url_highlight','');
+
+                document.getElementById('profileNameTB').value = theProfile.name;
+                document.getElementById('protocolCB').checked = theProfile.useProto;
+                document.getElementById('domainCB').checked = theProfile.useDomain;
+                document.getElementById('subdomainCB').checked = theProfile.useSubdom;
+                document.getElementById('pathCB').checked = theProfile.usePath;
+                document.getElementById('inputUseThisText').value = theProfile.useText;
+                selectOption( document.getElementById('whereLeetLB'), theProfile.whereL33t );
+                selectOption( document.getElementById('leetLevelLB'), theProfile.l33tLevel );                
+                selectOption( document.getElementById('hashAlgorithmLB'), theProfile.hashAlgorithm );
+                document.getElementById('passwdLength').value = theProfile.passwordLength;
+                //document.getElementById('usernameTB').value = theProfile.username;
+                //document.getElementById('modifier').value = theProfile.modifier;
+                
+                selectOrAddOption( document.getElementById('charset'), theProfile.charset );
+                document.getElementById('passwordPrefix').value = theProfile.passwordPrefix;
+                document.getElementById('passwordSuffix').value = theProfile.passwordSuffix;
+
+                // set URL highlights
+                if( theProfile.useProto ) document.getElementById('exprotocol').className += 'url_highlight';
+                if( theProfile.useSubdom ) document.getElementById('exsubdomain').className += 'url_highlight';
+                if( theProfile.useDomain ) document.getElementById('exdomain').className += 'url_highlight';
+                if( theProfile.usePath ) document.getElementById('expath').className += 'url_highlight';
+                
+                //enable/disable form fields
+                document.getElementById('leetLevelLB').disabled =  ( theProfile.whereL33t == "off" );
+            }
+            
+            function parseProfileForm() {
+                //TODO: should read the form and return a profile object
+                var prf = {};
+                prf.name = document.getElementById('profileNameTB').value;
+                prf.useProto = document.getElementById('protocolCB').checked;
+                prf.useDomain = document.getElementById('domainCB').checked;
+                prf.useSubdom = document.getElementById('subdomainCB').checked;
+                prf.usePath = document.getElementById('pathCB').checked;
+                prf.useText = document.getElementById('inputUseThisText').value;
+                prf.whereL33t = document.getElementById('whereLeetLB').value;
+                prf.l33tLevel = document.getElementById('leetLevelLB').value;
+                prf.hashAlgorithm = document.getElementById('hashAlgorithmLB').value;
+                prf.passwordLength = document.getElementById('passwdLength').value;
+                //prf.username = document.getElementById('usernameTB').value;
+                //prf.modifier = document.getElementById('modifier').value;
+                prf.charset = document.getElementById('charset').value;
+                prf.passwordPrefix = document.getElementById('passwordPrefix').value;
+                prf.passwordSuffix = document.getElementById('passwordSuffix').value;
+                
+                return prf;
+            }
+            
+            
+            function selectOption( selectObject, optionValue ) {
+                if( typeof selectObject == "string" ) selectObject = document.getElementById(selectObject);
+                if( null == selectObject || undefined == selectObject ) return;
+                
+                for( o in selectObject.options ) {
+                    if( optionValue == selectObject.options[o].value ) {
+                        selectObject.options[o].selected = true;
+                        break;
+                    }
+                }
+            }
+
+            function selectOrAddOption( selectObject, optionValue, optionLabel ) {
+                if( typeof selectObject == "string" ) selectObject = document.getElementById(selectObject);
+                if( null == selectObject || undefined == selectObject ) return;
+                var found = false;
+                
+                for( o in selectObject.options ) {
+                    if( optionValue == selectObject.options[o].value ) {
+                        selectObject.options[o].selected = true;
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if( !found ) {
+                    // need to add
+                    if( !optionLabel ) optionLabel = optionValue;
+                    var newopt = new Option(optionLabel, optionValue, false, true);
+                    selectObject.options.add( newopt );
+                }
+            }
+
+            
+            
+            // UI interaction handlers
+            function toggleClassName( element, style_name ) {
+                if( typeof element == "string" ) element = document.getElementById(element);
+                if( null === element || undefined === element.style ) return;
+                
+                var className = element.className;
+                if( className.match(style_name) )
+                    className = className.replace(style_name,'');
+                else
+                    className += " " + style_name;
+                
+                element.className = className;
+            }
+            function addClassName( element, style_name ) {
+                if( typeof element == "string" ) element = document.getElementById(element);
+                if( null === element || undefined === element.style ) return;
+                
+                var className = element.className;
+                if( !className.search(style_name) )
+                    className += " " + style_name;
+                
+                element.className = className;
+            }
+            function clearClassName( element, style_name ) {
+                if( typeof element == "string" ) element = document.getElementById(element);
+                if( null === element || undefined === element.style ) return;
+                
+                var className = element.className;
+                className = className.replace(style_name,'');
+                element.className = className;
+            }
+
+            // button handlers
+            
+            function saveBtnHandler() {
+                currentProfile = parseProfileForm();
+                safari.self.tab.dispatchMessage("updateProfile", currentProfile );
+                // should send back a profile and maybe a profileNames too
+            }
+            
+            function removeBtnHandler() {
+                var profileName = document.getElementById('profileNameTB').value;
+                safari.self.tab.dispatchMessage("deleteProfile", profileName );
+    
+                // should send back a profileNames message
+            }
+            
+            function copyBtnHandler() {
+                document.getElementById('profileNameTB').value = currentProfile.name + " copy";
+            }
+            
+            function profileSelectHandler() {
+                var profileName = document.getElementById('profile_list').value;
+                document.getElementById("detail").style.display = "inline-block";
+                document.getElementById("import_settings").style.display = "none";
+                document.getElementById("export_settings").style.display = "none";
+                safari.self.tab.dispatchMessage("getProfile", profileName );
+            }
+            
+            function newBtnHandler() {
+                document.getElementById("detail").style.display = "inline-block";
+                document.getElementById("import_settings").style.display = "none";
+                document.getElementById("export_settings").style.display = "none";
+
+                document.getElementById('profileNameTB').value = "New Profile";
+                
+            }
+                                                                                      
+            function importBtnHandler() {
+                document.getElementById("detail").style.display = "none";
+                document.getElementById("import_settings").style.display = "inline-block";
+                document.getElementById("export_settings").style.display = "none";                
+            }
+            function exportBtnHandler() {
+                document.getElementById("detail").style.display = "none";
+                document.getElementById("import_settings").style.display = "none";
+                document.getElementById("export_settings").style.display = "inline-block";
+                
+            }
+        
+        </script>
+    </head>
+    <body onLoad="onLoadHandler()">
+        <div id='head' class='optionstitle'>
+            <span>
+                <img class='titlelogo' src='ring-32x32.png' width='32' height='32' alt=""/> 
+                PasswordMaker : Safari - Options
+            </span>
+        </div>
+        
+        <div id="content">
+            <div id="left" class="left">
+                <h2>Profiles</h2>
+                <label for="profile_list" class="div">Profiles:</label>
+                <select id="profile_list" onChange="profileSelectHandler()"></select>
+                <br/>
+                <div id="add"   ><input type="button" class="button valign" value="New profile"     onClick="newBtnHandler()"/></div>
+            </div>
+
+            <div id="detail" class="right">
+                <h2>Details</h2>
+                <div id="detailform">
+                    <div class="row">
+                        <label for="profileNameTB">Name:</label>
+                        <input class="input" id="profileNameTB"/>
+                    </div>
+                    
+                    <div class="row">
+                        <label>URL Components:</label>
+                        <div class="url_example">
+                            <span id="exprotocol">http://</span><span id="exsubdomain">my.</span><span id="exdomain">example.com</span><span id="expath">/my/path?q=search#top</span>
+                        </div>
+                        
+                        <div class="subrow">
+                            <input type="checkbox" id="protocolCB" onchange="toggleClassName('exprotocol','url_highlight')" />
+                            <label for="protocolCB" class="checkbox">Protocol</label> 
+            			</div>
+            			<div class="subrow">
+                            <input type="checkbox" id="subdomainCB" onchange="toggleClassName('exsubdomain','url_highlight')" />
+                            <label for="subdomainCB" class="checkbox">Subdomain(s)</label>
+                        </div>
+            			<div class="subrow">
+                            <input type="checkbox" id="domainCB" onchange="toggleClassName('exdomain','url_highlight')" />
+                            <label for="domainCB" class="checkbox">Domain</label>
+            			</div>
+            			<div class="subrow">
+                            <input type="checkbox" id="pathCB" onchange="toggleClassName('expath','url_highlight')" />
+                            <label for="pathCB" class="checkbox">Port, path, anchor, query parameters</label>
+                        </div>
+                    </div>
+                    
+                    <div class="row"> 
+                        <label id="labelUseThisText">Use This Text:</label>
+                        <input id="inputUseThisText" class="input" maxlength="256" size="80" value="" />
+                        <!-- 
+                         If you want to use a fixed url everytime, you can fill it here. E.g. to use the same password on example.com and anotherexample.com, enter example.com here and it always uses example.com for this profile.</span>
+                        -->
+                    </div>
+                    
+                    <div class="row">
+                        <label for="whereLeetLB">Use l33t:</label>
+            			<select class="dropmenu" id="whereLeetLB" onclick="document.getElementById('leetLevelLB').disabled =  ( document.getElementById('whereLeetLB').value == 'off' );" >
+            				<option value="off">not at all</option>
+            				<option value="before-hashing">before generating password</option>
+            				<option value="after-hashing">after generating password</option>
+            				<option value="both">before and after generating password</option>
+            			</select>
+                    </div>
+                    
+                    <div class="row">
+                        <label id="leetLevelLabel" for="leetLevelLB">l33t Level:</label>
+            			<select class="dropmenu" id="leetLevelLB">
+            				<option value="0">1</option>
+            				<option value="1">2</option>
+            				<option value="2">3</option>
+            				<option value="3">4</option>
+            				<option value="4">5</option>
+            				<option value="5">6</option>
+            				<option value="6">7</option>
+            				<option value="7">8</option>
+            				<option value="8">9</option>
+            			</select>
+                    </div>
+                    
+                    <div class="row">
+                        <label for="hashAlgorithmLB">Hash Algorithm:</label>
+            			<select id="hashAlgorithmLB">
+            				<option value="md4">MD4</option>
+            				<option value="hmac-md4">HMAC-MD4</option>
+            				<option value="md5">MD5</option>
+            				<option value="md5_v6">MD5 Version 0.6</option>
+            				<option value="hmac-md5">HMAC-MD5</option>
+            				<option value="hmac-md5_v6">HMAC-MD5 Version 0.6</option>
+            				<option value="sha1">SHA-1</option>
+            				<option value="hmac-sha1">HMAC-SHA-1</option>
+            				<option value="sha256">SHA-256</option>
+            				<option value="hmac-sha256_fix">HMAC-SHA-256</option>
+            				<option value="hmac-sha256">HMAC-SHA-256 Version 1.5.1</option>
+            				<option value="rmd160">RIPEMD-160</option>
+            				<option value="hmac-rmd160">HMAC-RIPEMD-160</option>
+                            <option value="none">Do Not Hash</option>
+            			</select>
+                    </div>
+                    
+                    <div class="row">
+                        <label for="passwdLength">Password length:</label>
+            			<input class="standard" id="passwdLength" maxlength="3" size="3" value="12" />
+                    </div>
+                    <!--
+                    <div class="row">
+                        <label for="usernameTB">Username:</label>
+            			<input class="standard" id="usernameTB"/>
+                    </div>
+                    
+                    <div class="row">
+                        <label for="modifier">Modifier:</label>
+            			<input class="standard" id="modifier"/>
+                    </div>
+                    -->
+                    <div class="row">
+                        <label for="charset">Characters:</label>
+            			<select id="charset" name="charset"></select>
+            			<!-- <input class="standard" id="customCharset"/> -->
+                    </div>
+                    
+                    <div class="row">
+                        <label for="passwordPrefix">Password Prefix:</label>
+            			<input class="standard" id="passwordPrefix"/>
+                    </div>
+                    
+                    <div class="row">
+                        <label for="passwordSuffix">Password Suffix:</label>
+            			<input class="standard" id="passwordSuffix"/>
+                    </div>
+                    
+                
+                <div id="button-row">
+                    <span id="save"  ><input type="button" class="button" id="saveBtn" value="Save" onClick="saveBtnHandler()" /></span>
+                    <span id="remove"><input type="button" class="button" id="removeBtn" value="Remove" onClick="removeBtnHandler()" /></span>
+                    <span id="copy"  ><input type="button" class="button" id="copyBtn" value="Duplicate" onClick="copyBtnHandler()" /></span>
+                </div>
+            </div> <!-- detailform -->
+            </div> <!-- details -->
+                  
+        </div>
+    </body>
+</html>
+
+
+
